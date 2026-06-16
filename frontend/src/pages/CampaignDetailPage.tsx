@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { campaignsApi, contactsApi, analyticsApi, repliesApi, exportApi } from '../services/api'
 import { Campaign, Contact, Reply } from '../types'
-import { ArrowLeft, Play, Pause, Download, RefreshCw, Sparkles, Search, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Play, Pause, Download, Search, ChevronDown, Mail } from 'lucide-react'
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
@@ -40,6 +40,8 @@ export default function CampaignDetailPage() {
   const [tab, setTab] = useState<'contacts' | 'replies'>('contacts')
   const [search, setSearch] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const [template, setTemplate] = useState({ subject: '', body: '' })
+  const [showComposer, setShowComposer] = useState(false)
 
   const load = async () => {
     if (!id) return
@@ -67,10 +69,23 @@ export default function CampaignDetailPage() {
       if (action === 'launch') await campaignsApi.launch(id)
       if (action === 'pause') await campaignsApi.pause(id)
       if (action === 'resume') await campaignsApi.resume(id)
-      if (action === 'ai-summary') await campaignsApi.generateAISummary(id)
       await load()
     } catch (e: any) {
       alert(e?.response?.data?.detail || 'Action failed')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleGenerateEmails = async () => {
+    if (!id || !template.subject.trim() || !template.body.trim()) return
+    setActionLoading(true)
+    try {
+      await campaignsApi.generateEmails(id, template)
+      await load()
+      setShowComposer(false)
+    } catch (e: any) {
+      alert(e?.response?.data?.detail || 'Email generation failed')
     } finally {
       setActionLoading(false)
     }
@@ -102,6 +117,11 @@ export default function CampaignDetailPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {campaign.status === 'draft' && (
+            <button onClick={() => setShowComposer(s => !s)} disabled={actionLoading} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60">
+              <Mail className="w-4 h-4" /> Generate Emails
+            </button>
+          )}
+          {campaign.status === 'draft' && (
             <button onClick={() => handleAction('launch')} disabled={actionLoading} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-60">
               <Play className="w-4 h-4" /> Launch
             </button>
@@ -116,9 +136,6 @@ export default function CampaignDetailPage() {
               <Play className="w-4 h-4" /> Resume
             </button>
           )}
-          <button onClick={() => handleAction('ai-summary')} disabled={actionLoading} className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-60">
-            <Sparkles className="w-4 h-4" /> AI Summary
-          </button>
           <div className="relative group">
             <button className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
               <Download className="w-4 h-4" /> Export <ChevronDown className="w-3 h-3" />
@@ -144,14 +161,36 @@ export default function CampaignDetailPage() {
         </div>
       )}
 
-      {/* AI Summary */}
-      {campaign.ai_summary && (
-        <div className="bg-purple-50 border border-purple-200 rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-4 h-4 text-purple-600" />
-            <h3 className="font-semibold text-purple-900 text-sm">AI Campaign Insights</h3>
+      {showComposer && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Subject</label>
+            <input
+              value={template.subject}
+              onChange={e => setTemplate(t => ({ ...t, subject: e.target.value }))}
+              placeholder="Opportunity at {{company}}"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
-          <p className="text-sm text-purple-800 whitespace-pre-line">{campaign.ai_summary}</p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Body</label>
+            <textarea
+              value={template.body}
+              onChange={e => setTemplate(t => ({ ...t, body: e.target.value }))}
+              rows={10}
+              placeholder={'Hi {{name}},\n\nI wanted to reach out regarding opportunities at {{company}}.\n\nBest,\nYour Name'}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            />
+            <p className="text-xs text-gray-400 mt-1">Use {'{{name}}'}, {'{{company}}'}, {'{{title}}'}, {'{{email}}'}, and any custom Excel column name.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={handleGenerateEmails} disabled={actionLoading || !template.subject.trim() || !template.body.trim()} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60">
+              {actionLoading ? 'Generating...' : 'Create Drafts'}
+            </button>
+            <button onClick={() => setShowComposer(false)} disabled={actionLoading} className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-60">
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 

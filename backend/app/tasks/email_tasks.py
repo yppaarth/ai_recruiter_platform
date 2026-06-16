@@ -76,10 +76,6 @@ def send_campaign_email(
         contact.status = EmailStatus.SENT.value
         db.commit()
 
-        # Schedule follow-ups
-        from app.tasks.followup_tasks import schedule_followups
-        schedule_followups.delay(email_id, campaign_id, contact_id, user_id)
-
         logger.info(f"Email sent to {contact.email} (email_id={email_id})")
         return {"status": "sent", "email_id": email_id}
 
@@ -176,7 +172,6 @@ def generate_campaign_emails(
         failed = 0
 
         for contact in contacts:
-            # Check if email already generated
             existing = (
                 db.query(Email)
                 .filter(
@@ -185,23 +180,32 @@ def generate_campaign_emails(
                 )
                 .first()
             )
-            if existing:
-                continue
 
             try:
-                email = Email(
-                    id=str(uuid.uuid4()),
-                    campaign_id=campaign_id,
-                    contact_id=contact.id,
-                    user_id=user_id,
-                    subject=render_contact_template(subject_template, contact),
-                    body=render_contact_template(body_template, contact),
-                    is_followup=False,
-                    followup_number=0,
-                    status=EmailStatus.PENDING.value,
-                    tracking_pixel_id=str(uuid.uuid4()),
-                )
-                db.add(email)
+                subject = render_contact_template(subject_template, contact)
+                body = render_contact_template(body_template, contact)
+
+                if existing:
+                    if existing.status != EmailStatus.PENDING.value:
+                        continue
+                    existing.subject = subject
+                    existing.body = body
+                    existing.error_message = None
+                    email = existing
+                else:
+                    email = Email(
+                        id=str(uuid.uuid4()),
+                        campaign_id=campaign_id,
+                        contact_id=contact.id,
+                        user_id=user_id,
+                        subject=subject,
+                        body=body,
+                        is_followup=False,
+                        followup_number=0,
+                        status=EmailStatus.PENDING.value,
+                        tracking_pixel_id=str(uuid.uuid4()),
+                    )
+                    db.add(email)
                 db.commit()
                 generated += 1
             except Exception as e:

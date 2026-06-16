@@ -63,8 +63,8 @@ export const campaignsApi = {
   pause: (id: string) => api.post(`/campaigns/${id}/pause`).then(r => r.data),
   resume: (id: string) => api.post(`/campaigns/${id}/resume`).then(r => r.data),
   clone: (id: string) => api.post(`/campaigns/${id}/clone`).then(r => r.data),
-  generateEmails: (id: string, candidateProfile: string) =>
-    api.post(`/campaigns/${id}/generate-emails`, null, { params: { candidate_profile: candidateProfile } }).then(r => r.data),
+  generateEmails: (id: string, data: { subject: string; body: string }) =>
+    api.post(`/campaigns/${id}/generate-emails`, data).then(r => r.data),
   generateAISummary: (id: string) => api.post(`/campaigns/${id}/ai-summary`).then(r => r.data),
 }
 

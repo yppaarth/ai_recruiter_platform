@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
-from typing import List, Union
+from typing import List, Union, Optional
 import json
 
 
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
 
     # Grok AI
-    GROK_API_KEY: str
+    GROK_API_KEY: Optional[str] = None
     GROK_MODEL: str = "grok-4.3"
     GROK_BASE_URL: str = "https://api.x.ai/v1"
 

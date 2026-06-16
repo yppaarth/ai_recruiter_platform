@@ -12,7 +12,7 @@ export default function NewCampaignPage() {
   const [contactsFile, setContactsFile] = useState<File | null>(null)
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [uploadResult, setUploadResult] = useState<any>(null)
-  const [candidateProfile, setCandidateProfile] = useState('')
+  const [emailTemplate, setEmailTemplate] = useState({ subject: '', body: '' })
   const [form, setForm] = useState({
     name: '',
     description: '',
@@ -57,12 +57,12 @@ export default function NewCampaignPage() {
     }
   }
 
-  const handleGenerateAndLaunch = async () => {
-    if (!campaignId || !candidateProfile.trim()) return
+  const handleGenerateEmails = async () => {
+    if (!campaignId || !emailTemplate.subject.trim() || !emailTemplate.body.trim()) return
     setLoading(true)
     setError('')
     try {
-      await campaignsApi.generateEmails(campaignId, candidateProfile)
+      await campaignsApi.generateEmails(campaignId, emailTemplate)
       navigate(`/campaigns/${campaignId}`)
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Failed to generate emails')
@@ -107,8 +107,8 @@ export default function NewCampaignPage() {
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required placeholder="e.g. Google Outreach Q3 2025" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Candidate Profile (used for AI generation)</label>
-            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="e.g. AI/ML Engineer with 3 years of experience in NLP, LLMs, and building RAG pipelines at Samsung R&D..." className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Campaign Notes</label>
+            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} placeholder="Optional notes for this campaign" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -173,18 +173,27 @@ export default function NewCampaignPage() {
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Your Candidate Profile *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Subject *</label>
+            <input
+              value={emailTemplate.subject}
+              onChange={e => setEmailTemplate(t => ({ ...t, subject: e.target.value }))}
+              placeholder="Opportunity at {{company}}"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Body *</label>
             <textarea
-              value={candidateProfile}
-              onChange={e => setCandidateProfile(e.target.value)}
-              rows={5}
-              placeholder="Describe yourself for AI email personalization. e.g.: AI/ML Engineer with 3+ years of experience. Ranked 4th globally at ICASSP 2025 Face-Voice Matching challenge. Built RAG pipelines at Samsung R&D with FAISS + BM25 hybrid retrieval. Published in Springer (Scopus indexed). M.Tech Data Science at DTU. Looking for GenAI/LLM Engineer roles."
+              value={emailTemplate.body}
+              onChange={e => setEmailTemplate(t => ({ ...t, body: e.target.value }))}
+              rows={10}
+              placeholder={'Hi {{name}},\n\nI wanted to reach out regarding opportunities at {{company}}.\n\nBest,\nYour Name'}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
-            <p className="text-xs text-gray-400 mt-1">This is used by Grok AI to write personalized emails for each recruiter.</p>
+            <p className="text-xs text-gray-400 mt-1">Use placeholders like {'{{name}}'}, {'{{company}}'}, {'{{title}}'}, {'{{email}}'}, and any custom Excel column name.</p>
           </div>
-          <button onClick={handleGenerateAndLaunch} disabled={!candidateProfile.trim() || loading} className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium text-sm hover:bg-blue-700 disabled:opacity-60 transition-colors">
-            {loading ? 'Generating emails with AI...' : '✨ Generate Personalized Emails →'}
+          <button onClick={handleGenerateEmails} disabled={!emailTemplate.subject.trim() || !emailTemplate.body.trim() || loading} className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium text-sm hover:bg-blue-700 disabled:opacity-60 transition-colors">
+            {loading ? 'Generating emails...' : 'Generate Personalized Emails ->'}
           </button>
         </div>
       )}
