@@ -45,9 +45,7 @@ class IMAPService:
         replies = []
         try:
             with MailBox(self.host).login(self.username, self.password, initial_folder=folder) as mailbox:
-                criteria = AND(seen=False)
-                if since_date:
-                    criteria = AND(date_gte=since_date.date(), seen=False)
+                criteria = AND(date_gte=since_date.date()) if since_date else "ALL"
 
                 for msg in mailbox.fetch(criteria, mark_seen=False):
                     reply = {

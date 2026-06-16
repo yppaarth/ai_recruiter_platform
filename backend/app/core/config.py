@@ -55,6 +55,7 @@ class Settings(BaseSettings):
 
     # URLs
     BASE_URL: str = "http://localhost:8000"
+    TRACKING_BASE_URL: Optional[str] = None
 
     # CORS
     CORS_ORIGINS: Union[List[str], str] = ["http://localhost:3000", "http://localhost:5173"]

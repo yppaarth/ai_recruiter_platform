@@ -40,7 +40,7 @@ def track_open(
         db.add(event)
 
         # Update email stats
-        email.open_count += 1
+        email.open_count = (email.open_count or 0) + 1
         if not email.first_opened_at:
             email.first_opened_at = now
         email.last_opened_at = now
@@ -50,7 +50,7 @@ def track_open(
         # Update contact stats
         contact = db.query(Contact).filter(Contact.id == email.contact_id).first()
         if contact:
-            contact.open_count += 1
+            contact.open_count = (contact.open_count or 0) + 1
             if contact.status in ("sent", "delivered", "pending"):
                 contact.status = EmailStatus.OPENED.value
 
@@ -89,13 +89,13 @@ def track_click(
         )
         db.add(event)
 
-        email.click_count += 1
+        email.click_count = (email.click_count or 0) + 1
         if email.status in ("sent", "delivered", "opened", "pending"):
             email.status = EmailStatus.CLICKED.value
 
         contact = db.query(Contact).filter(Contact.id == email.contact_id).first()
         if contact:
-            contact.click_count += 1
+            contact.click_count = (contact.click_count or 0) + 1
             if contact.status in ("sent", "delivered", "opened", "pending"):
                 contact.status = EmailStatus.CLICKED.value
 

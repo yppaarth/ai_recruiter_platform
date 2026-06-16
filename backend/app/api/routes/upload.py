@@ -27,6 +27,12 @@ def ensure_upload_dir() -> Path:
     return upload_path
 
 
+def safe_upload_filename(filename: str, fallback: str) -> str:
+    """Keep the uploaded basename while preventing path traversal."""
+    safe_name = Path(filename.replace("\\", "/")).name.strip()
+    return safe_name or fallback
+
+
 @router.post("/contacts/{campaign_id}", response_model=UploadResponse)
 async def upload_contacts(
     campaign_id: str,
@@ -128,7 +134,7 @@ async def upload_resume(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
-    filename = file.filename or "resume.pdf"
+    filename = safe_upload_filename(file.filename or "resume.pdf", "resume.pdf")
     ext = Path(filename).suffix.lower()
     if ext not in ALLOWED_RESUME_TYPES:
         raise HTTPException(status_code=400, detail="Resume must be a PDF file")
@@ -141,16 +147,15 @@ async def upload_resume(
             detail=f"File too large. Max size: {settings.MAX_UPLOAD_SIZE_MB}MB",
         )
 
-    upload_dir = ensure_upload_dir() / "resumes" / current_user.id
+    upload_dir = ensure_upload_dir() / "resumes" / current_user.id / campaign_id
     upload_dir.mkdir(parents=True, exist_ok=True)
 
-    safe_filename = f"{campaign_id}_{uuid.uuid4().hex}{ext}"
-    file_path = upload_dir / safe_filename
+    file_path = upload_dir / filename
 
     # Delete old resume if exists
     if campaign.resume_path:
         old_path = Path(campaign.resume_path)
-        if old_path.exists():
+        if old_path.exists() and old_path != file_path:
             old_path.unlink()
 
     with open(file_path, "wb") as f:

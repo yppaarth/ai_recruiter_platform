@@ -49,5 +49,44 @@ def test_tracking_open(client, auth_headers, db):
     assert resp.headers["content-type"] == "image/gif"
 
     db.refresh(email)
+    db.refresh(contact)
     assert email.open_count == 1
+    assert contact.open_count == 1
     assert email.first_opened_at is not None
+
+
+def test_tracking_click_updates_email_and_contact(client, db):
+    reg_resp = client.post("/api/v1/auth/register", json={
+        "email": "clicktrack@example.com", "username": "clicktrackuser", "password": "trackpass1"
+    })
+    user_id = reg_resp.json()["user"]["id"]
+    headers = {"Authorization": f"Bearer {reg_resp.json()['access_token']}"}
+
+    camp_resp = client.post("/api/v1/campaigns/", json={"name": "Click Track Camp"}, headers=headers)
+    cid = camp_resp.json()["id"]
+
+    from app.models.models import Contact
+    contact = Contact(
+        id=str(uuid.uuid4()),
+        campaign_id=cid,
+        name="Clicker",
+        email="clicker@example.com",
+        status="sent",
+    )
+    db.add(contact)
+    db.commit()
+
+    email = _make_email(db, cid, contact.id, user_id)
+
+    resp = client.get(
+        f"/api/v1/tracking/click/{email.id}",
+        params={"url": "https://example.com/jobs"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert resp.headers["location"] == "https://example.com/jobs"
+
+    db.refresh(email)
+    db.refresh(contact)
+    assert email.click_count == 1
+    assert contact.click_count == 1

@@ -1,5 +1,6 @@
 import smtplib
 import ssl
+import html
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -32,9 +33,13 @@ class EmailService:
         self.smtp_from_name = smtp_from_name or settings.SMTP_FROM_NAME
         self.smtp_use_tls = smtp_use_tls
 
+    @property
+    def tracking_base_url(self) -> str:
+        return (settings.TRACKING_BASE_URL or settings.BASE_URL).rstrip("/")
+
     def _inject_tracking_pixel(self, html_body: str, tracking_id: str) -> str:
         """Inject a 1x1 tracking pixel at the end of the email body."""
-        pixel_url = f"{settings.BASE_URL}/api/v1/tracking/open/{tracking_id}"
+        pixel_url = f"{self.tracking_base_url}/api/v1/tracking/open/{tracking_id}"
         pixel = f'<img src="{pixel_url}" width="1" height="1" style="display:none;" alt="" />'
         if "</body>" in html_body:
             return html_body.replace("</body>", f"{pixel}</body>")
@@ -43,20 +48,45 @@ class EmailService:
     def _wrap_links(self, html_body: str, email_id: str) -> str:
         """Replace all href links with tracked redirect links."""
         def replace_link(match: re.Match) -> str:
-            original_url = match.group(1)
+            quote = match.group(1)
+            original_url = match.group(2)
             if "/track/" in original_url or "tracking" in original_url:
                 return match.group(0)
             import urllib.parse
             encoded_url = urllib.parse.quote(original_url, safe="")
-            tracked_url = f"{settings.BASE_URL}/api/v1/tracking/click/{email_id}?url={encoded_url}"
-            return f'href="{tracked_url}"'
+            tracked_url = f"{self.tracking_base_url}/api/v1/tracking/click/{email_id}?url={encoded_url}"
+            return f"href={quote}{tracked_url}{quote}"
 
-        return re.sub(r'href="([^"]+)"', replace_link, html_body)
+        return re.sub(r"href=(['\"])(.*?)\1", replace_link, html_body)
+
+    def _linkify_urls(self, text: str) -> str:
+        """Escape text and turn plain URLs into clickable links."""
+        url_pattern = re.compile(r"(?<![\"'=])(https?://[^\s<]+|www\.[^\s<]+)")
+        parts: list[str] = []
+        last_index = 0
+
+        for match in url_pattern.finditer(text):
+            parts.append(html.escape(text[last_index:match.start()]))
+            display_url = match.group(0)
+            trailing = ""
+            while display_url and display_url[-1] in ".,;:!?)":
+                trailing = display_url[-1] + trailing
+                display_url = display_url[:-1]
+
+            href = display_url if display_url.startswith(("http://", "https://")) else f"https://{display_url}"
+            parts.append(
+                f'<a href="{html.escape(href, quote=True)}">{html.escape(display_url)}</a>'
+                f"{html.escape(trailing)}"
+            )
+            last_index = match.end()
+
+        parts.append(html.escape(text[last_index:]))
+        return "".join(parts)
 
     def _text_to_html(self, text: str) -> str:
         """Convert plain text email body to basic HTML."""
-        html = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        paragraphs = html.split("\n\n")
+        linked_html = self._linkify_urls(text)
+        paragraphs = linked_html.split("\n\n")
         html_parts = []
         for para in paragraphs:
             if para.strip():
