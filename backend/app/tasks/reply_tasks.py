@@ -43,7 +43,7 @@ def check_for_replies() -> dict:
                 .join(Campaign, Contact.campaign_id == Campaign.id)
                 .filter(
                     Campaign.user_id == user.id,
-                    Campaign.status.in_(["running", "completed"]),
+                    Campaign.status.in_(["running", "paused", "completed"]),
                     Contact.has_replied == False,
                 )
                 .all()
